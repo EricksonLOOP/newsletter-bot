@@ -1,0 +1,1 @@
+"""LinkedIn integration was removed from this project."""

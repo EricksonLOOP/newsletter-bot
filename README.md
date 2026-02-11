@@ -9,33 +9,35 @@ A Python application that fetches news articles from GNews, generates engaging n
 - **Structured Data Modeling:** Uses Pydantic models (`NewsletterArticleModel`, `TopicModel`, `SourceModel`) to ensure data consistency and validity.
 - **Agent-Based Architecture:** Employs Langchain agents for specific tasks like JSON parsing, managed by the `MultiAgents` class.
 - **Text File Output:** Saves the generated newsletter content to a `.txt` file using the `save_newsletter_to_txt` utility.
+- **Postgres Storage:** Stores generated summaries and metadata for dedupe and persistence.
+- **Redis Cache:** Caches previously summarized newsletters to avoid re-processing.
 - **Kafka Integration (Future):** Includes commented-out code for sending newsletters to a Kafka topic, indicating potential for real-time distribution.
 - **Dockerized Deployment:** Provides a `docker-compose.yml` file for easy setup of Kafka, Zookeeper, and Kafdrop.
 
 ## 🛠️ Tech Stack
 
-*   **Backend:** Python
-*   **AI Tools:** OpenAI, Langchain
-*   **Data Validation:** Pydantic
-*   **API Interaction:** `requests`
-*   **Kafka Integration:** `confluent-kafka`
-*   **Environment Management:** `dotenv`
-*   **Build Tool:** Poetry
-*   **Containerization:** Docker, Docker Compose
+- **Backend:** Python
+- **AI Tools:** OpenAI, Langchain
+- **Data Validation:** Pydantic
+- **API Interaction:** `requests`
+- **Kafka Integration:** `confluent-kafka`
+- **Environment Management:** `dotenv`
+- **Build Tool:** Poetry
+- **Containerization:** Docker, Docker Compose
 
-| Category      | Technology                  | Version          |
-|---------------|-----------------------------|------------------|
-| Programming Language | Python                      | >=3.13,<4.0      |
-| AI Framework    | Langchain                   | >=0.3.27,<0.4.0  |
-| OpenAI Integration | langchain-openai            | >=0.3.32,<0.4.0  |
-| OpenAI Library  | openai                      | >=1.102.0,<2.0.0 |
-| Data Validation | Pydantic                    | N/A              |
-| HTTP Client     | requests                    | N/A              |
-| Kafka Client    | confluent-kafka             | >=2.11.1,<3.0.0  |
-| Env Variables   | dotenv                      | >=0.9.9,<0.10.0  |
-| Build System    | Poetry                      | N/A              |
-| Containerization| Docker, Docker Compose      | N/A              |
-| Langchain Community | langchain-community | >=0.3.29,<0.4.0 |
+| Category             | Technology             | Version          |
+| -------------------- | ---------------------- | ---------------- |
+| Programming Language | Python                 | >=3.13,<4.0      |
+| AI Framework         | Langchain              | >=0.3.27,<0.4.0  |
+| OpenAI Integration   | langchain-openai       | >=0.3.32,<0.4.0  |
+| OpenAI Library       | openai                 | >=1.102.0,<2.0.0 |
+| Data Validation      | Pydantic               | N/A              |
+| HTTP Client          | requests               | N/A              |
+| Kafka Client         | confluent-kafka        | >=2.11.1,<3.0.0  |
+| Env Variables        | dotenv                 | >=0.9.9,<0.10.0  |
+| Build System         | Poetry                 | N/A              |
+| Containerization     | Docker, Docker Compose | N/A              |
+| Langchain Community  | langchain-community    | >=0.3.29,<0.4.0  |
 
 ## 📦 Getting Started
 
@@ -43,7 +45,7 @@ A Python application that fetches news articles from GNews, generates engaging n
 
 - Python (>=3.13,<4.0)
 - Poetry
-- Docker (optional, for Kafka setup)
+- Docker (optional, for Kafka/Postgres/Redis setup)
 - OpenAI API key
 - GNews API key
 
@@ -67,6 +69,9 @@ A Python application that fetches news articles from GNews, generates engaging n
     ```
     OPENAI_API_KEY=<your_openai_api_key>
     GNEWS_API_KEY=<your_gnews_api_key>
+    DATABASE_URL=postgresql+psycopg://newsletter:newsletter@localhost:5432/newsletter
+    REDIS_URL=redis://localhost:6379/0
+    CACHE_TTL_SECONDS=604800
     ```
 
 ### Running Locally
@@ -85,13 +90,13 @@ A Python application that fetches news articles from GNews, generates engaging n
 
     This will start the process of fetching news, generating newsletters, and saving them to the `newsletters` folder.
 
-3.  (Optional) Start Kafka using Docker Compose:
+3.  (Optional) Start Kafka/Postgres/Redis using Docker Compose:
 
     ```bash
     docker-compose up -d
     ```
 
-    This will start Zookeeper, Kafka, and Kafdrop. You can access Kafdrop at `http://localhost:19000` to monitor the Kafka cluster. Note: the Kafka integration in `main.py` is currently commented out.
+    This will start Postgres, Redis, Zookeeper, Kafka, and Kafdrop. You can access Kafdrop at `http://localhost:19000` to monitor the Kafka cluster. Note: the Kafka integration in `main.py` is currently commented out.
 
 ## 📂 Project Structure
 
