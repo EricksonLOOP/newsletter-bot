@@ -1,6 +1,7 @@
 import json
 import os
 from typing import Iterable
+from urllib.parse import urlparse
 
 from confluent_kafka import Producer
 
@@ -15,6 +16,33 @@ _LOCAL_NAME_MAP = {
 	"asia": "ASIA",
 	"africa": "AFRICA",
 	"latam": "LATAM",
+}
+
+_LOCAL_TLDS = {
+	".br": "BR",
+	".us": "US",
+	".eu": "EU",
+	".asia": "ASIA",
+	".africa": "AFRICA",
+	".mx": "LATAM",
+	".ar": "LATAM",
+	".cl": "LATAM",
+	".co": "LATAM",
+	".pe": "LATAM",
+	".uy": "LATAM",
+	".py": "LATAM",
+	".bo": "LATAM",
+	".ec": "LATAM",
+	".ve": "LATAM",
+}
+
+_LOCAL_KEYWORDS = {
+	"BR": {"brasil", "brazil", "brasileiro", "sao paulo", "rio", "brasilia"},
+	"US": {"usa", "u.s.", "united states", "america", "american", "new york", "california"},
+	"EU": {"europe", "european", "eu", "europeia", "ue", "germany", "france", "spain", "italy", "uk", "united kingdom"},
+	"ASIA": {"asia", "asian", "china", "japan", "india", "korea"},
+	"AFRICA": {"africa", "african", "nigeria", "south africa", "egypt"},
+	"LATAM": {"latam", "latin america", "america latina", "mexico", "argentina", "chile", "colombia", "peru", "uruguay", "paraguay", "bolivia", "ecuador", "venezuela"},
 }
 
 _CONTENT_NAMES = {
@@ -37,6 +65,28 @@ _CONTENT_NAMES = {
 	"TRAVEL",
 	"OPINION",
 	"BREAKING",
+}
+
+_CONTENT_KEYWORDS = {
+	"IA": {"ai", "a.i.", "artificial intelligence", "inteligencia artificial", "machine learning", "ml", "llm"},
+	"WORLD": {"world", "global", "international", "mundo", "internacional"},
+	"POLITICS": {"politics", "political", "election", "government", "congress", "senate", "president", "politica", "eleicao", "governo"},
+	"ECONOMY": {"economy", "economic", "inflation", "gdp", "market", "stock", "finance", "financas", "economia", "mercado"},
+	"TECH": {"tech", "technology", "startup", "gadgets", "device", "hardware"},
+	"SCIENCE": {"science", "research", "space", "nasa", "discovery", "ciencia"},
+	"HEALTH": {"health", "medicine", "medical", "hospital", "saude", "vacina"},
+	"SPORTS": {"sports", "football", "soccer", "nba", "fifa", "esporte"},
+	"ENTERTAINMENT": {"entertainment", "movie", "series", "music", "celebrity", "cinema", "serie"},
+	"CULTURE": {"culture", "art", "museum", "cultura", "arte"},
+	"EDUCATION": {"education", "school", "university", "college", "educacao", "enem"},
+	"ENVIRONMENT": {"environment", "climate", "sustainability", "green", "meio ambiente", "clima"},
+	"CRIME": {"crime", "police", "investigation", "law", "crime", "policia"},
+	"LIFESTYLE": {"lifestyle", "fashion", "food", "travel", "vida", "moda", "culinaria"},
+	"BUSINESS": {"business", "entrepreneur", "company", "merger", "negocio", "empreendedor"},
+	"SOFTWARE": {"software", "developer", "programming", "code", "coding", "dev"},
+	"TRAVEL": {"travel", "tourism", "trip", "turismo", "viagem"},
+	"OPINION": {"opinion", "editorial", "column", "opniao", "coluna"},
+	"BREAKING": {"breaking", "urgent", "alert", "urgente", "ultima hora"},
 }
 
 
@@ -65,6 +115,51 @@ def _normalize_content_types(content_raw: Iterable[str]) -> list[str]:
 	return normalized
 
 
+def _extract_text_chunks(news_model: NewsletterArticleModel) -> list[str]:
+	chunks = [news_model.title, news_model.description, news_model.source.name, news_model.source.url]
+	for topic in news_model.topics:
+		chunks.append(topic.title)
+		chunks.extend(topic.paragraphs)
+	additional = []
+	for attr in ("tags", "topics", "keywords", "categories"):
+		value = getattr(news_model, attr, None)
+		if isinstance(value, list):
+			additional.extend([str(item) for item in value])
+	chunks.extend(additional)
+	return [chunk for chunk in chunks if chunk]
+
+
+def _detect_locals_from_text(chunks: Iterable[str]) -> list[str]:
+	text = " ".join(chunks).lower()
+	locals_found: list[str] = []
+	for local_key, keywords in _LOCAL_KEYWORDS.items():
+		if any(keyword in text for keyword in keywords):
+			locals_found.append(local_key)
+	return locals_found
+
+
+def _detect_locals_from_url(url: str | None) -> list[str]:
+	if not url:
+		return []
+	try:
+		hostname = urlparse(url).hostname or ""
+		for tld, local_key in _LOCAL_TLDS.items():
+			if hostname.endswith(tld):
+				return [local_key]
+	except Exception:
+		return []
+	return []
+
+
+def _detect_content_types(chunks: Iterable[str]) -> list[str]:
+	text = " ".join(chunks).lower()
+	content_found: list[str] = []
+	for content_key, keywords in _CONTENT_KEYWORDS.items():
+		if any(keyword in text for keyword in keywords):
+			content_found.append(content_key)
+	return content_found
+
+
 def _build_paragraphs(news_model: NewsletterArticleModel) -> list[str]:
 	paragraphs: list[str] = []
 	for topic in news_model.topics:
@@ -77,22 +172,24 @@ def _build_paragraphs(news_model: NewsletterArticleModel) -> list[str]:
 
 
 def build_content_payload(news_model: NewsletterArticleModel) -> dict:
-	default_locals = _normalize_locals(_split_csv(os.getenv("KAFKA_DEFAULT_LOCALS", "Global")))
-	if not default_locals:
-		default_locals = ["Global"]
+	chunks = _extract_text_chunks(news_model)
+	locals_found = _detect_locals_from_url(news_model.source.url)
+	locals_found.extend(_detect_locals_from_text(chunks))
+	locals_normalized = _normalize_locals(locals_found)
+	if not locals_normalized:
+		locals_normalized = ["Global"]
 
-	default_content_types = _normalize_content_types(
-		_split_csv(os.getenv("KAFKA_DEFAULT_CONTENT_TYPES", "WORLD"))
-	)
-	if not default_content_types:
-		default_content_types = ["WORLD"]
+	content_found = _detect_content_types(chunks)
+	content_normalized = _normalize_content_types(content_found)
+	if not content_normalized:
+		content_normalized = ["WORLD"]
 
 	return {
 		"title": news_model.title,
 		"subTitle": news_model.description or "",
 		"paragraphs": _build_paragraphs(news_model),
-		"locals": default_locals,
-		"contentTypes": default_content_types,
+		"locals": locals_normalized,
+		"contentTypes": content_normalized,
 		"resource": {
 			"name": news_model.source.name,
 			"url": news_model.source.url,
