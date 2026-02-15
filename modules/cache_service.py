@@ -28,5 +28,5 @@ def build_cache_from_env() -> NewsletterCache:
     redis_url = os.getenv("REDIS_URL")
     if not redis_url:
         raise ValueError("REDIS_URL is not set")
-    ttl_seconds = int(os.getenv("CACHE_TTL_SECONDS", "604800"))
+    ttl_seconds = int(os.getenv("CACHE_TTL_SECONDS", "1200"))
     return NewsletterCache(redis_url, ttl_seconds)

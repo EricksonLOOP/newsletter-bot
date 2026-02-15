@@ -9,10 +9,9 @@ A Python application that fetches news articles from GNews, generates engaging n
 - **Structured Data Modeling:** Uses Pydantic models (`NewsletterArticleModel`, `TopicModel`, `SourceModel`) to ensure data consistency and validity.
 - **Agent-Based Architecture:** Employs Langchain agents for specific tasks like JSON parsing, managed by the `MultiAgents` class.
 - **Text File Output:** Saves the generated newsletter content to a `.txt` file using the `save_newsletter_to_txt` utility.
-- **Postgres Storage:** Stores generated summaries and metadata for dedupe and persistence.
-- **Redis Cache:** Caches previously summarized newsletters to avoid re-processing.
-- **Kafka Integration (Future):** Includes commented-out code for sending newsletters to a Kafka topic, indicating potential for real-time distribution.
-- **Dockerized Deployment:** Provides a `docker-compose.yml` file for easy setup of Kafka, Zookeeper, and Kafdrop.
+- **Redis Cache:** Caches already published newsletters to avoid re-processing.
+- **Kafka Integration:** Sends newsletters to a Kafka topic for downstream processing.
+- **Dockerized Deployment:** Provides a `docker-compose.yml` file for easy setup of Redis, Kafka, Zookeeper, and Kafdrop.
 
 ## 🛠️ Tech Stack
 
@@ -45,7 +44,7 @@ A Python application that fetches news articles from GNews, generates engaging n
 
 - Python (>=3.13,<4.0)
 - Poetry
-- Docker (optional, for Kafka/Postgres/Redis setup)
+- Docker (optional, for Kafka/Redis setup)
 - OpenAI API key
 - GNews API key
 
@@ -69,9 +68,8 @@ A Python application that fetches news articles from GNews, generates engaging n
     ```
     OPENAI_API_KEY=<your_openai_api_key>
     GNEWS_API_KEY=<your_gnews_api_key>
-    DATABASE_URL=postgresql+psycopg://newsletter:newsletter@localhost:5432/newsletter
     REDIS_URL=redis://localhost:6379/0
-    CACHE_TTL_SECONDS=604800
+    CACHE_TTL_SECONDS=1200
     ```
 
 ### Running Locally
@@ -90,13 +88,13 @@ A Python application that fetches news articles from GNews, generates engaging n
 
     This will start the process of fetching news, generating newsletters, and saving them to the `newsletters` folder.
 
-3.  (Optional) Start Kafka/Postgres/Redis using Docker Compose:
+3.  (Optional) Start Kafka/Redis using Docker Compose:
 
     ```bash
     docker-compose up -d
     ```
 
-    This will start Postgres, Redis, Zookeeper, Kafka, and Kafdrop. You can access Kafdrop at `http://localhost:19000` to monitor the Kafka cluster. Note: the Kafka integration in `main.py` is currently commented out.
+    This will start Redis, Zookeeper, Kafka, and Kafdrop. You can access Kafdrop at `http://localhost:19000` to monitor the Kafka cluster.
 
 ## 📂 Project Structure
 
